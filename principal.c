@@ -6,6 +6,7 @@
 #include <sys/types.h>
 #include <signal.h>
 
+/*Prototipo do handler de sinais. Sua implementacao esta no final do arquivo*/
 void sigHandler(int);
 
 #ifdef __linux__
@@ -31,7 +32,8 @@ main (int argc, char **argv)
 	char testador2 [TAMANHO_MAXIMO_COMANDO];
 
 	/*Caminho dos comandos
-		Eles dependem do Sistema Operacional e são definidos no pré-processamento (linhas 8 a 14 deste programa)*/
+		Necessarios para o a funcao execvp. Eles dependem do Sistema Operacional e
+		são definidos no pré-processamento (linhas 8 a 14 deste programa)*/
 	char path1[TAMANHO_MAXIMO_COMANDO] = BIN;
 	char path2[TAMANHO_MAXIMO_COMANDO] = BIN;
 
@@ -139,6 +141,7 @@ main (int argc, char **argv)
 				exit(1);
 			} else if (rc == 0){
 				/* Processo filho (ou seja, processo que será substituido pelo comando recebido)*/
+				printf ("Comando 1 executado.\n");
 				erro = execvp(primeiroComando[0], primeiroComando);
 				if (erro){ /* Esta linha não ocorre caso o comando seja executado sem erros */
 					printf ("Ocorreu um erro na execucao do comando! Erro #%u\n", erro);
@@ -157,7 +160,7 @@ main (int argc, char **argv)
 				fprintf (stderr, "Fork failed\n");
 				exit(1);
 			} else if (rc == 0){
-				printf ("Hello, i am child (pid:%d)\n", (int) getpid());
+				printf ("Comando 2 executado.\n");
 				erro = execvp(segundoComando[0], segundoComando);
 				if (erro){
 					printf ("Ocorreu um erro na execucao do comando!\n");

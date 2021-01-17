@@ -26,9 +26,10 @@ p1: $(P1OBJS)
 
 p2: $(P2OBJS)
 	$(LD) $(LFLAGS) -o $@ $(P2OBJS)
-	
+
 disparador: $(MAINOBJS)
 	$(LD) $(LFLAGS) -o $@ $(MAINOBJS)
+	@echo "Arquivo compilado: disparador"
 
 .PHONY: clean
 
