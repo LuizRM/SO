@@ -4,9 +4,11 @@ LD = gcc
 CFLAGS = -Wall -std=c99
 LFLAGS = -Wall
 
-TESTES = p1
+TESTES = p1\
+		 p2
 
 P1OBJS = p1.o
+P2OBJS = p2.o
 
 TRABALHO = disparador
 
@@ -19,10 +21,12 @@ EXECS = $(TESTES) $(TRABALHO)
 
 all: $(EXECS)
 
-
 p1: $(P1OBJS)
 	$(LD) $(LFLAGS) -o $@ $(P1OBJS)
 
+p2: $(P2OBJS)
+	$(LD) $(LFLAGS) -o $@ $(P2OBJS)
+	
 disparador: $(MAINOBJS)
 	$(LD) $(LFLAGS) -o $@ $(MAINOBJS)
 

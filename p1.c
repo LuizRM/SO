@@ -10,7 +10,6 @@ int
 main (int argc, char **argv)
 {
   char *myargs[5];
-  int rc_wait = 0;
 
   printf ("Hello World!(pid:%d)\n", getpid());
   int rc = fork();
@@ -30,9 +29,10 @@ main (int argc, char **argv)
     execvp(myargs[0], myargs);
   } else {
     /* parent goes here */
-    rc_wait = wait(NULL);
-    printf ("Hello, I am parent of %d (my pid:%d)\n", rc, (int) getpid());
+    wait(NULL);
+    /*printf ("Hello, I am parent of %d (my pid:%d)\n", rc, (int) getpid());*/
   }
+  printf ("Teste\n");
 
   return 0;
 }

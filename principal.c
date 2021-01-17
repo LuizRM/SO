@@ -4,6 +4,9 @@
 #include <string.h>
 #include <sys/wait.h>
 #include <sys/types.h>
+#include <signal.h>
+
+void sigHandler(int);
 
 #ifdef __linux__
 #define BIN "/bin/"
@@ -15,10 +18,12 @@
 
 #define TAMANHO_MAXIMO_COMANDO 100
 
+unsigned short sinal = 0;
+
 int
 main (int argc, char **argv)
 {
-	/*strings que irao receber os comandos a serem parseados ou já parseados.
+	/*Strings que irao receber os comandos a serem parseados ou já parseados.
 		São necesssarias duas strings diferentes por conta da natureza da funcao
 		strtok, que retorna um ponteiro. Isso tornaria os dois arrays de comandos
 		iguais apos guardar o segundo argumento, caso se utilizasse o mesmo testador*/
@@ -29,7 +34,6 @@ main (int argc, char **argv)
 		Eles dependem do Sistema Operacional e são definidos no pré-processamento (linhas 8 a 14 deste programa)*/
 	char path1[TAMANHO_MAXIMO_COMANDO] = BIN;
 	char path2[TAMANHO_MAXIMO_COMANDO] = BIN;
-	char *myargs[5];
 
 	/*Variaveis auxiliares*/
 	unsigned short comandoOK = 0;
@@ -37,8 +41,9 @@ main (int argc, char **argv)
 	const char separador [2] = " ";
 	char *token;
 	int erro;
+	pid_t rc = 0;
 
-	printf ("Disparador incializado com pid=%d\n", getpid());
+
 /* ----------------------------------------------------- Aquisicao dos comandos --------------------------------------------------------*/
 	while (!comandoOK){
 		spaces = 0;
@@ -53,13 +58,13 @@ main (int argc, char **argv)
 				spaces++;
 			}
  		}
-		spaces++; /*Ex: em uma string com 4 argumentos, existem 3 espaços*/
+		spaces++; /*Corrige spaces para representar o numero de argumentos. Ex: em uma string com 4 argumentos, existem 3 espaços, ou seja espacos+1*/
 
-		token = strtok(testador1, separador); /*Separa os argumentos da string*/
-		if (token[strlen(token)-1] == '\n') /*retira o pula linha do final da string se houver */
+		token = strtok(testador1, separador); 	/*Separa os argumentos da string usando caracter de espaço como separador*/
+		if (token[strlen(token)-1] == '\n') 	/*retira o pula linha do final da string se houver */
 			token[strlen(token)-1] = '\0';
-		strcat(path1,token);
-		if (access(path1, F_OK) < 0){
+		strcat(path1,token);					/*Adiciona o caminho da pasta de comandos ao comando*/
+		if (access(path1, F_OK) < 0){			/* access() retorna 0 caso o comando exista e -1 caso não.*/
 			printf ("Erro! Comando não existe, tente novamente\n");
 		} else {
 			comandoOK = 1;
@@ -69,7 +74,7 @@ main (int argc, char **argv)
 	/*Passando o comando para o array de strings correspondente*/
 	char *primeiroComando [spaces+2];
 	primeiroComando[0] = path1;
-	token = strtok (NULL, separador);
+	token = strtok (NULL, separador);			/* lê o restante dos argumentos de testador1 */
 	for (i = 1; token != NULL;i++){
 		if (token[strlen(token)-1] == '\n'){
 			token[strlen(token)-1] = '\0';
@@ -77,12 +82,9 @@ main (int argc, char **argv)
 		primeiroComando[i] = token;
 		token = strtok (NULL, separador);
 	}
-	for (i=0; i < spaces; i++){
-		printf ("%s", primeiroComando[i]);
-	}
-	primeiroComando[spaces] = NULL;
+	primeiroComando[spaces] = NULL;				/* Ultima string deve ser nula para se adequar ao execvp()*/
 
-	/*Registro do segundo comando*/
+	/*Registro do segundo comando, exatamente a mesma logica usada do bloco acima*/
 	comandoOK = 0;
 	while (!comandoOK){
 		spaces = 0;
@@ -97,10 +99,10 @@ main (int argc, char **argv)
 				spaces++;
 			}
 		}
-		spaces++; /*Ex: em uma string com 4 argumentos, existem 3 espaços*/
+		spaces++;
 
-		token = strtok(testador2, separador); /*Separa os argumentos da string*/
-		if (token[strlen(token)-1] == '\n') /*retira o pula linha do final da string se houver */
+		token = strtok(testador2, separador);
+		if (token[strlen(token)-1] == '\n')
 			token[strlen(token)-1] = '\0';
 		strcat(path2,token);
 		if (access(path2, F_OK) < 0){
@@ -121,42 +123,76 @@ main (int argc, char **argv)
 		token = strtok (NULL, separador);
 	}
 	segundoComando[spaces] = NULL;
-	for (i=0; i < spaces; i++){
-		printf ("%s", primeiroComando[i]);
-	}
-	printf("\n");
-	for (i=0; i < spaces; i++){
-		printf ("%s", segundoComando[i]);
-	}
-	printf("\n");
 
 /*---------------------------------------------------------- Espera e execucao dos sinais -----------------------------------------------*/
 
-	int rc = fork();
-	if (rc < 0){
-		/* fork failed*/
-		fprintf (stderr, "Fork failed\n");
-		exit(1);
-	} else if (rc == 0){
-		/* child */
-		printf ("Hello, i am child (pid:%d)\n", (int) getpid());
-		/*myargs[0] = "/bin/ping";
-		myargs[1] = "8.8.8.8";
-		myargs[2] = "-c";
-		myargs[3] = "5";
-		myargs[4] = NULL;
-		printf ("Comando: %s\n", myargs[0]);
-		execvp(myargs[0], myargs);*/
-		printf ("Comando: %s\n", primeiroComando[0]);
-		erro = execvp(primeiroComando[0], primeiroComando);
-		if (erro){
-			printf ("Ocorreu um erro!\n");
+	printf ("Disparador incializado com pid=%d\n", getpid());
+	signal(SIGUSR1, sigHandler);	/*Associa SIGUSR1 ao sigHandler. Ao receber este sinal, sigHandler() sera chamada*/
+	signal(SIGUSR2, sigHandler);
+	signal(SIGTERM, sigHandler);
+	while(1){
+		if (sinal == 1 /*SIGUSR1*/){
+			rc = fork();
+			if (rc < 0){
+				/* Fork falhou*/
+				fprintf (stderr, "Fork failed\n");
+				exit(1);
+			} else if (rc == 0){
+				/* Processo filho (ou seja, processo que será substituido pelo comando recebido)*/
+				erro = execvp(primeiroComando[0], primeiroComando);
+				if (erro){ /* Esta linha não ocorre caso o comando seja executado sem erros */
+					printf ("Ocorreu um erro na execucao do comando! Erro #%u\n", erro);
+				}
+				exit(0);
+			} else {
+			/* Processo pai. Apenas espera o processo filho ser finalizado */
+				wait(NULL);
+			}
+			sinal = 0;
 		}
-	} else {
-	/* parent goes here */
-		wait(NULL);
-		printf ("Hello, I am parent of %d (my pid:%d)\n", rc, (int) getpid());
+
+		if (sinal == 2 /*SIGUSR2*/){
+			rc = fork();
+			if (rc < 0){
+				fprintf (stderr, "Fork failed\n");
+				exit(1);
+			} else if (rc == 0){
+				printf ("Hello, i am child (pid:%d)\n", (int) getpid());
+				erro = execvp(segundoComando[0], segundoComando);
+				if (erro){
+					printf ("Ocorreu um erro na execucao do comando!\n");
+				}
+				exit(0);
+			} else {
+				wait(NULL);
+			}
+			sinal = 0;
+		}
+
+		if (sinal == 3 /*SIGTERM*/){
+			printf ("Finalizando o disparador...\n");
+			return 0;
+		}
+		sleep(1); /*Evita que o processo pai utilize muito a CPU*/
 	}
 
 	return 0;
+}
+
+void sigHandler(int sigNum){
+	if (sigNum == SIGUSR1){
+		signal(SIGUSR1, sigHandler); /*Ao ser recebido e tratado, o sinal se desvincula de sigHandler(), aqui apenas os associa de novo*/
+		sinal = 1;
+	}
+
+	if (sigNum == SIGUSR2){
+		signal(SIGUSR2, sigHandler);
+		sinal = 2;
+	}
+
+	if (sigNum == SIGTERM){
+		signal(SIGTERM, sigHandler);
+		sinal = 3;
+	}
+
 }
